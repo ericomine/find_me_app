@@ -13,7 +13,7 @@ dependencies:
   flutter_bloc: ^8.0.1
   flutter_localizations:
     sdk: flutter
-  geolocator: ^6.1.14
+  geolocator: ^8.2.1
   intl: ^0.17.0
 
 dev_dependencies:
