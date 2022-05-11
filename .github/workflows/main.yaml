@@ -2,8 +2,8 @@ name: find_me_app
 
 on:
   pull_request:
-    main
-    develop
+    - main
+    - develop
 
 jobs:
   build:
