@@ -1,6 +1,6 @@
 name: find_me_app
 description: An app for geolocating yourself
-version: 1.0.0+1
+version: 0.0.0+1
 publish_to: none
 
 environment:
