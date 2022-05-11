@@ -4,6 +4,6 @@ class Geolocation {
     required this.longitude,
   });
 
-  final String latitude;
-  final String longitude;
+  final double latitude;
+  final double longitude;
 }
