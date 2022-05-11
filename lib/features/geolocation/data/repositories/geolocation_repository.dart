@@ -1,3 +1,4 @@
+import 'package:either/either.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocation_data_source.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocation_network_data_source.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocation_sensor_data_source.dart';
@@ -12,6 +13,17 @@ class GeolocationRepository implements GeolocationRepositoryInterface {
 
   @override
   Future<Geolocation> getGeolocation() async {
-    return const Geolocation(latitude: 0, longitude: 0);
+    final sensorResult = await _sensorDataSource.getGeolocation();
+
+    return sensorResult.fold(
+      onLeft: (error) async {
+        final networkResult = await _networkDataSource.getGeolocation();
+        return networkResult.fold(
+          onLeft: (_) => throw UnimplementedError(),
+          onRight: (model) => model.toEntity(),
+        );
+      },
+      onRight: (model) => model.toEntity(),
+    );
   }
 }
