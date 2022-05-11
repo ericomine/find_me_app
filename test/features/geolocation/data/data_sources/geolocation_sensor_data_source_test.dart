@@ -1,6 +1,6 @@
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocation_sensor_data_source.dart';
+import 'package:find_me_app/features/geolocation/data/data_sources/geolocator_error.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocator_wrapper.dart';
-import 'package:find_me_app/features/shared/exceptions/geolocation_exceptions.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:geolocator/geolocator.dart';
@@ -26,25 +26,32 @@ void main() {
       when(() => _geolocator.getCurrentPosition())
           .thenAnswer((_) async => positionStub);
 
-      final geolocation = await sut.getGeolocation();
+      final result = await sut.getGeolocation();
 
+      result.fold(
+        onLeft: (_) => fail('Unexpected error'),
+        onRight: (geolocation) {
+          expect(geolocation.latitude, positionStub.latitude);
+          expect(geolocation.longitude, positionStub.longitude);
+        },
+      );
       verify(() => _geolocator.checkPermission()).called(1);
       verify(() => _geolocator.getCurrentPosition()).called(1);
-      expect(geolocation.latitude, positionStub.latitude);
-      expect(geolocation.longitude, positionStub.longitude);
       verifyNoMoreInteractions(_geolocator);
     },
   );
 
   test(
-    'Should throw GeolocationNoPermissionException if permission is denied',
+    'Should return GeolocatorError.notAllowed if permission is denied',
     () async {
       when(() => _geolocator.checkPermission())
           .thenAnswer((_) async => LocationPermission.denied);
 
-      expect(
-        () async => sut.getGeolocation(),
-        throwsA(const TypeMatcher<GeolocationNoPermissionException>()),
+      final result = await sut.getGeolocation();
+
+      result.fold(
+        onLeft: (error) => expect(error, GeolocatorError.notAllowed),
+        onRight: (_) => fail('Unexpected success'),
       );
 
       verify(() => _geolocator.checkPermission()).called(1);
@@ -54,7 +61,7 @@ void main() {
   );
 
   test(
-    'Should throw GeolocationDisabledException if permission is granted, '
+    'Should return GeolocatorError.notAvailable if permission is granted, '
     'but sensor is disabled',
     () async {
       when(() => _geolocator.checkPermission())
@@ -62,32 +69,36 @@ void main() {
       when(() => _geolocator.getCurrentPosition())
           .thenThrow(const LocationServiceDisabledException());
 
-      expect(
-        () async => sut.getGeolocation(),
-        throwsA(const TypeMatcher<GeolocationDisabledException>()),
+      final result = await sut.getGeolocation();
+
+      result.fold(
+        onLeft: (error) => expect(error, GeolocatorError.notAvailable),
+        onRight: (_) => fail('Unexpected success'),
       );
 
       verify(() => _geolocator.checkPermission()).called(1);
-      verifyNever(() => _geolocator.getCurrentPosition());
+      verify(() => _geolocator.getCurrentPosition()).called(1);
       verifyNoMoreInteractions(_geolocator);
     },
   );
 
   test(
-    'Should throw GeolocationSensorException when generic exception occurs',
+    'Should return GeolocatorError.other when generic exception occurs',
     () async {
       when(() => _geolocator.checkPermission())
           .thenAnswer((_) async => LocationPermission.always);
       when(() => _geolocator.getCurrentPosition())
           .thenThrow(PlatformException(code: 'ERROR'));
 
-      expect(
-        () async => sut.getGeolocation(),
-        throwsA(const TypeMatcher<GeolocationSensorException>()),
+      final result = await sut.getGeolocation();
+
+      result.fold(
+        onLeft: (error) => expect(error, GeolocatorError.other),
+        onRight: (_) => fail('Unexpected success'),
       );
 
       verify(() => _geolocator.checkPermission()).called(1);
-      verifyNever(() => _geolocator.getCurrentPosition());
+      verify(() => _geolocator.getCurrentPosition()).called(1);
       verifyNoMoreInteractions(_geolocator);
     },
   );

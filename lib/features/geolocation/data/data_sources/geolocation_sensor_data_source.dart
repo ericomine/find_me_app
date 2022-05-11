@@ -1,9 +1,10 @@
 import 'dart:async';
 
+import 'package:either/either.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocation_data_source.dart';
+import 'package:find_me_app/features/geolocation/data/data_sources/geolocator_error.dart';
 import 'package:find_me_app/features/geolocation/data/data_sources/geolocator_wrapper.dart';
 import 'package:find_me_app/features/geolocation/data/models/geolocation_model.dart';
-import 'package:find_me_app/features/shared/exceptions/geolocation_exceptions.dart';
 import 'package:geolocator/geolocator.dart';
 
 class GeolocationSensorDataSource implements GeolocationDataSource {
@@ -12,31 +13,36 @@ class GeolocationSensorDataSource implements GeolocationDataSource {
   final GeolocatorWrapper _geolocator;
 
   @override
-  Future<GeolocationModel> getGeolocation() async {
-    try {
-      await _checkPermission();
+  Future<Either<GeolocatorError, GeolocationModel>> getGeolocation() async {
+    final permission = await _checkPermission();
 
-      final position = await _geolocator.getCurrentPosition();
-      final model = GeolocationModel(
-        latitude: position.latitude,
-        longitude: position.longitude,
-      );
-      return model;
-    } on GeolocationNoPermissionException {
-      rethrow;
-    } on LocationServiceDisabledException catch (error, stackTrace) {
-      throw GeolocationDisabledException(error, stackTrace);
-    } catch (error, stackTrace) {
-      throw GeolocationSensorException(error, stackTrace);
-    }
+    return permission.fold(
+      onLeft: (left) async => Left(left),
+      onRight: (right) async {
+        try {
+          final position = await _geolocator.getCurrentPosition();
+          final model = GeolocationModel(
+            latitude: position.latitude,
+            longitude: position.longitude,
+          );
+          return Right(model);
+        } on LocationServiceDisabledException catch (_) {
+          return const Left(GeolocatorError.notAvailable);
+        } catch (_) {
+          return const Left(GeolocatorError.other);
+        }
+      },
+    );
   }
 
-  Future<void> _checkPermission() async {
+  Future<Either<GeolocatorError, void>> _checkPermission() async {
     final permission = await _geolocator.checkPermission();
     final allowed = permission == LocationPermission.always ||
         permission == LocationPermission.whileInUse;
+
     if (!allowed) {
-      throw const GeolocationNoPermissionException();
+      return const Left(GeolocatorError.notAllowed);
     }
+    return const Right(null);
   }
 }
